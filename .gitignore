@@ -1,5 +1,5 @@
 .vscode
-.iead
+.idea
 build
 devel
 cmake-build-debug

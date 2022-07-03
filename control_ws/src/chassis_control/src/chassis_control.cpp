@@ -119,7 +119,6 @@ public:
         angle_pid = PID(angle_kp, angle_ki, angle_kd, max_steering_angle, max_angle_iout);
 
         // Start a subscriber to listen to target v and w
-// TODO        target_vw_sub = n.subscribe<>(target_vw_topic, 1, );
         target_vw_sub = n.subscribe(target_vw_topic, 1, &ChassisControl::target_vwCallBack, this);
         ctrl_fb_sub = n.subscribe<yhs_can_msgs::ctrl_fb>(ctrl_fb_topic,1, &ChassisControl::ctrl_fbCallBack, this);
 
@@ -168,6 +167,7 @@ public:
     
     void update_output(const ros::TimerEvent&)
     {
+        // calculate target angle from v and w
         if (target_velocity == 0)
             target_steering_angle = 0;
         else if (target_velocity > 0)
