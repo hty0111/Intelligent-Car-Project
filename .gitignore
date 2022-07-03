@@ -1,0 +1,5 @@
+.vscode
+.iead
+build
+devel
+cmake-build-debug

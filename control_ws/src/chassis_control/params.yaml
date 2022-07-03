@@ -1,0 +1,21 @@
+# vehicle params
+wheelbase: 0.66           # meters
+max_velocity: 5           # meters/second
+max_steering_angle: 25    # degree
+
+# pid controller
+control_rate: 0.1 # 0.01
+vel_kp: 0.5
+vel_ki: 0
+vel_kd: 0
+angle_kp: 1
+angle_ki: 0
+angle_kd: 0
+max_vel_iout: 0.5
+max_angle_iout: 10
+
+# names of topics to listen and publish to
+target_vw_topic: "/target_vw"   # "/teb_feedback"
+ctrl_fb_topic: "/ctrl_fb"
+ctrl_cmd_topic: "/ctrl_cmd"
+io_cmd_topic: "/io_cmd"
