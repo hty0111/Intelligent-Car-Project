@@ -6,7 +6,8 @@
  */
 
 #include "ros/ros.h"
-#include "std_msgs/Int32.h"
+#include "std_msgs/Bool.h"
+#include "std_srvs/SetBool.h"
 #include "geometry_msgs/Twist.h"
 #include "tf/transform_broadcaster.h"
 #include "nav_msgs/Odometry.h"
@@ -22,13 +23,11 @@
 #include "yhs_can_msgs/bms_flag_Infor_fb.h"
 #include "yhs_can_msgs/Drive_MCUEcoder_fb.h"
 #include "yhs_can_msgs/Veh_Diag_fb.h"
+#include "teb_local_planner/FeedbackMsg.h"
 #include "pid.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <string>
+#include <cstdlib>
+#include <cstring>
 
 using namespace chassis_control;
 
@@ -40,9 +39,10 @@ private:
     double current_velocity, current_steering_angle;
     double target_velocity, target_steering_angle, target_w;
     double max_velocity, max_steering_angle;
+    uint8_t current_gear;
+
+    // The control message
     yhs_can_msgs::ctrl_cmd ctrl_msg;
-    yhs_can_msgs::io_cmd io_msg;
-//    teb_local_planner::FeedbackMsg teb_msg;
 
     // The controller params
     double vel_kp, vel_ki, vel_kd;
@@ -52,31 +52,26 @@ private:
     // A ROS node
     ros::NodeHandle n;
 
+    // Start to control
+    bool AUTO_MODE;
+
     // A timer to update output
     ros::Timer update_timer;
 
-    // Control rate
-    double control_rate;
-
     // PID controller
+    double control_rate;
+    bool USE_PID_CONTROLLER;
     PID vel_pid, angle_pid;
 
     // Listen for target and feedback
     ros::Subscriber target_vw_sub;
     ros::Subscriber ctrl_fb_sub;
-//    ros::Subscriber lr_wheel_fb_sub = n.subscribe<yhs_can_msgs::lr_wheel_fb>("lr_wheel_fb",5, &ChassisControl::lr_wheel_fbCallBack);
-//    ros::Subscriber rr_wheel_fb_sub = n.subscribe<yhs_can_msgs::rr_wheel_fb>("rr_wheel_fb",5, &rr_wheel_fbCallBack);
-//    ros::Subscriber io_fb_sub = n.subscribe<yhs_can_msgs::io_fb>("io_fb",5, &io_fbCallBack);
-//    ros::Subscriber odo_fb_sub = n.subscribe<yhs_can_msgs::odo_fb>("odo_fb",5, &odo_fbCallBack);
-//    ros::Subscriber bms_Infor_fb_sub = n.subscribe<yhs_can_msgs::bms_Infor_fb>("bms_Infor_fb",5, &bms_Infor_fbCallBack);
-//    ros::Subscriber bms_flag_Infor_fb_sub = n.subscribe<yhs_can_msgs::bms_flag_Infor_fb>("bms_flag_Infor_fb",5, &bms_flag_Infor_fbCallback);
-//    ros::Subscriber Drive_MCUEcoder_fb_sub = n.subscribe<yhs_can_msgs::Drive_MCUEcoder_fb>("Drive_MCUEcoder_fb",5, &Drive_MCUEcoder_fbCallBack);
-//    ros::Subscriber Veh_Diag_fb_sub = n.subscribe<yhs_can_msgs::Veh_Diag_fb>("Veh_Diag_fb",5, &Veh_Diag_fbCallBack);
 
     // Publish velocity and angle
     ros::Publisher ctrl_cmd_pub;
-    ros::Publisher io_cmd_pub;
 
+    // Server for auto mode
+    ros::ServiceServer auto_mode_server;
 
 public:
     ChassisControl()
@@ -89,7 +84,6 @@ public:
         target_steering_angle = 0;
         current_velocity = 0;
         current_steering_angle = 0;
-        io_msg.io_cmd_enable = 1;
 
         // Get the vehicle params
         n.getParam("wheelbase", wheelbase);
@@ -97,6 +91,7 @@ public:
         n.getParam("max_steering_angle", max_steering_angle);
 
         // Get the pid controller params
+        n.getParam("USE_PID_CONTROLLER", USE_PID_CONTROLLER);
         n.getParam("control_rate", control_rate);
         n.getParam("vel_kp", vel_kp);
         n.getParam("vel_ki", vel_ki);
@@ -108,55 +103,58 @@ public:
         n.getParam("max_angle_iout", max_angle_iout);
 
         // Get the topic names
-        std::string target_vw_topic, ctrl_fb_topic, ctrl_cmd_topic, io_cmd_topic;
+        std::string target_vw_topic, ctrl_fb_topic, ctrl_cmd_topic, auto_mode_service;
         n.getParam("target_vw_topic", target_vw_topic);
         n.getParam("ctrl_fb_topic", ctrl_fb_topic);
         n.getParam("ctrl_cmd_topic", ctrl_cmd_topic);
-        n.getParam("io_cmd_topic", io_cmd_topic);
+        n.getParam("auto_mode_service", auto_mode_service);
 
         // Init pid controller
         vel_pid = PID(vel_kp, vel_ki, vel_kd, max_velocity, max_vel_iout);
         angle_pid = PID(angle_kp, angle_ki, angle_kd, max_steering_angle, max_angle_iout);
 
-        // Start a subscriber to listen to target v and w
-        target_vw_sub = n.subscribe(target_vw_topic, 1, &ChassisControl::target_vwCallBack, this);
-        ctrl_fb_sub = n.subscribe<yhs_can_msgs::ctrl_fb>(ctrl_fb_topic,1, &ChassisControl::ctrl_fbCallBack, this);
+        // Start subscribers
+        target_vw_sub = n.subscribe(target_vw_topic, 1, &ChassisControl::target_vw_Callback, this);
+        ctrl_fb_sub = n.subscribe<yhs_can_msgs::ctrl_fb>(ctrl_fb_topic,1, &ChassisControl::ctrl_fb_Callback, this);
 
-        // Make a publisher for velocity and angle command
+        // Make publishers
         ctrl_cmd_pub = n.advertise<yhs_can_msgs::ctrl_cmd>(ctrl_cmd_topic, 1);
-        // Make a publisher for io command
-        io_cmd_pub = n.advertise<yhs_can_msgs::io_cmd>(io_cmd_topic, 1);
+
+        // Make service
+        auto_mode_server = n.advertiseService(auto_mode_service, &ChassisControl::auto_mode_Callback, this);
     }
     
-// TODO
-//    void target_vwCallBack(const teb_local_planner::FeedbackMsg::ConstPtr & msg)
-//    {
-//        float linear_x = msg->trajectories.front().trajectory.front().velocity.linear.x;
-//        float linear_y = msg->trajectories.front().trajectory.front().velocity.linear.y;
-//        target_velocity = sqrt(linear_x * linear_x + linear_y * linear_y);
-//        target_w = msg->trajectories.front().trajectory.front().velocity.angular.z;
-//    }
-    void target_vwCallBack(const geometry_msgs::Twist::ConstPtr & msg)
+    // TODO teb发布的消息
+    void target_vw_Callback(const teb_local_planner::FeedbackMsg::ConstPtr & msg)
     {
-//        ROS_INFO("Receive target v and w");
-        target_velocity = msg->linear.x;
-        target_w = msg->angular.x;
+        double linear_x = msg->trajectories.front().trajectory.front().velocity.linear.x;
+        double linear_y = msg->trajectories.front().trajectory.front().velocity.linear.y;
+        target_velocity = sqrt(linear_x * linear_x + linear_y * linear_y);
+        target_w = msg->trajectories.front().trajectory.front().velocity.angular.z;
     }
 
-    void ctrl_fbCallBack(const yhs_can_msgs::ctrl_fb::ConstPtr & msg)
+    /* for debug */
+//    void target_vw_Callback(const geometry_msgs::Twist::ConstPtr & msg)
+//    {
+//        target_velocity = msg->linear.x;
+//        target_w = msg->angular.x;
+//    }
+
+    void ctrl_fb_Callback(const yhs_can_msgs::ctrl_fb::ConstPtr & msg)
     {
         current_velocity = msg->ctrl_fb_velocity;
         current_steering_angle = msg->ctrl_fb_steering;
+        current_gear = msg->ctrl_fb_gear;
     }
 
-//    void lr_wheel_fbCallBack(const yhs_can_msgs::lr_wheel_fb msg){ROS_INFO("GET lr_wheel_fb!");}
-//    void rr_wheel_fbCallBack(const yhs_can_msgs::rr_wheel_fb msg){ROS_INFO("GET rr_wheel_fb!");}
-//    void io_fbCallBack(const yhs_can_msgs::io_fb msg){ROS_INFO("GET io_fb!");}
-//    void odo_fbCallBack(const yhs_can_msgs::odo_fb msg){ROS_INFO("GET odo_fb!");}
-//    void bms_Infor_fbCallBack(const yhs_can_msgs::bms_Infor_fb msg){ROS_INFO("GET bms_Infor_fb!");}
-//    void bms_flag_Infor_fbCallback(const yhs_can_msgs::bms_flag_Infor_fb msg){ROS_INFO("GET bms_flag_Infor_fb!");}
-//    void Drive_MCUEcoder_fbCallBack(const yhs_can_msgs::Drive_MCUEcoder_fb msg){ROS_INFO("GET Drive_MCUEcoder_fb!");}
-//    void Veh_Diag_fbCallBack(const yhs_can_msgs::Veh_Diag_fb msg){ROS_INFO("GET Veh_Diag_fb!");}
+    // TODO
+    bool auto_mode_Callback(std_srvs::SetBool::Request & req, std_srvs::SetBool::Response & res)
+    {
+        AUTO_MODE = req.data;
+        res.success = true;
+        res.message = "Start auto mode!";
+        return true;
+    }
 
     void run()
     {
@@ -167,34 +165,58 @@ public:
     
     void update_output(const ros::TimerEvent&)
     {
-        // calculate target angle from v and w
-        if (target_velocity == 0)
-            target_steering_angle = 0;
-        else if (target_velocity > 0)
-            target_steering_angle = atan2(wheelbase * target_w, target_velocity) / M_PI * 180;
-        else
-            target_steering_angle = -atan2(wheelbase * target_w, abs(target_velocity)) / M_PI * 180;
+        if (AUTO_MODE)
+        {
+            // Calculate target angle from v and w
+            if (target_velocity == 0)
+            {
+                target_steering_angle = 0;
+                ctrl_msg.ctrl_cmd_gear = 3;     // N
+            }
+            else if (target_velocity > 0)
+            {
+                target_steering_angle = atan2(wheelbase * target_w, target_velocity) / M_PI * 180;
+                ctrl_msg.ctrl_cmd_gear = 4;     // D
+            }
+            else
+            {
+                target_steering_angle = -atan2(wheelbase * target_w, abs(target_velocity)) / M_PI * 180;
+                ctrl_msg.ctrl_cmd_gear = 2;     // R
+            }
 
-        ctrl_msg.ctrl_cmd_velocity = (float) abs(vel_pid.compute(target_velocity, current_velocity));
-        ctrl_msg.ctrl_cmd_steering = (float) angle_pid.compute(target_steering_angle, current_steering_angle);
+            /* for debug */
+//        n.getParam("debug_vel", target_velocity);
+//        n.getParam("debug_angle", target_steering_angle);
 
-        if (ctrl_msg.ctrl_cmd_velocity >= 0)
-            ctrl_msg.ctrl_cmd_gear = 4; // D
+            if (USE_PID_CONTROLLER)
+            {
+                ctrl_msg.ctrl_cmd_velocity = (float) vel_pid.compute(abs(target_velocity), current_velocity);
+                ctrl_msg.ctrl_cmd_steering = (float) angle_pid.compute(target_steering_angle, current_steering_angle);
+            }
+            else
+            {
+                ctrl_msg.ctrl_cmd_velocity = (float) abs(target_velocity);
+                ctrl_msg.ctrl_cmd_steering = (float) target_steering_angle;
+            }
+        }
         else
-            ctrl_msg.ctrl_cmd_gear = 2; // R
+        {
+            ctrl_msg.ctrl_cmd_gear = 0;
+            ctrl_msg.ctrl_cmd_velocity = 0;
+            ctrl_msg.ctrl_cmd_steering = 0;
+        }
+
+        ROS_INFO("Velocity --- output: %.2f | target: %.2f | current: %.2f", ctrl_msg.ctrl_cmd_velocity, target_velocity, current_velocity);
+        ROS_INFO("PID --- pout: %.2f | iout: %.2f | dout: %.2f", vel_pid.get_pout(), vel_pid.get_iout(), vel_pid.get_dout());
+        ROS_INFO("Angle --- output: %.2f | target: %.2f | current: %.2f", ctrl_msg.ctrl_cmd_steering, target_steering_angle, current_steering_angle);
+        ROS_INFO("Gear --- target: %d | current: %d", ctrl_msg.ctrl_cmd_gear, current_gear);
+
+//        /* for debug */
+//        ctrl_msg.ctrl_cmd_gear = 2;
+//        ctrl_msg.ctrl_cmd_velocity = 0.2;
+//        ctrl_msg.ctrl_cmd_steering = 0;
 
         ctrl_cmd_pub.publish(ctrl_msg);
-//        ROS_INFO("tar_w: %.2f, tar_v: %.2f", target_w, target_velocity);
-//        ROS_INFO("tar_angle: %.2f, fdb_angle: %.2f", target_steering_angle, current_steering_angle);
-        ROS_INFO("vel: %.2f, angle: %.2f, gear: %d", ctrl_msg.ctrl_cmd_velocity, ctrl_msg.ctrl_cmd_steering, ctrl_msg.ctrl_cmd_gear);
-
-        if (target_steering_angle > 15 && target_velocity > 0)
-            io_msg.io_cmd_turn_lamp = 1;
-        else if (target_steering_angle < -15 && target_velocity > 0)
-            io_msg.io_cmd_turn_lamp = 2;
-        else
-            io_msg.io_cmd_turn_lamp = 0;
-        io_cmd_pub.publish(io_msg);
     }
 };
 

@@ -4,18 +4,33 @@ max_velocity: 5           # meters/second
 max_steering_angle: 25    # degree
 
 # pid controller
-control_rate: 0.1 # 0.01
-vel_kp: 0.5
-vel_ki: 0
-vel_kd: 0
-angle_kp: 1
-angle_ki: 0
-angle_kd: 0
-max_vel_iout: 0.5
+USE_PID_CONTROLLER: 0
+control_rate: 0.01
+vel_pid_mode: 0   # 0: position, 1: delta
+vel_kp: 1
+vel_ki: 0.01
+vel_kd: 1
+max_vel_iout: 0.2
+angle_pid_mode: 0
+angle_kp: 0.4
+angle_ki: 0.05
+angle_kd: 1.5
 max_angle_iout: 10
 
-# names of topics to listen and publish to
-target_vw_topic: "/target_vw"   # "/teb_feedback"
+# names of topics to listen to
+target_vw_topic: "/teb_feedback"  # "/target_vw"
 ctrl_fb_topic: "/ctrl_fb"
+io_fb_topic: "/io_fb"
+lr_wheel_fb_topic: "/lr_wheel_fb"
+rr_wheel_fb_topic: "/rr_wheel_fb"
+
+# names of topics to publish to
 ctrl_cmd_topic: "/ctrl_cmd"
 io_cmd_topic: "/io_cmd"
+
+# names of service
+auto_mode_service: "/Begin_stage_control_for_ask"
+
+# debug
+debug_vel: -0.2
+debug_angle: 10

@@ -149,7 +149,7 @@ include_directories(
 #   ${catkin_LIBRARIES}
 # )
 
-add_executable(target_vw src/main.cpp)
+add_executable(target_vw src/target_vw.cpp)
 target_link_libraries(target_vw ${catkin_LIBRARIES})
 
 #############
