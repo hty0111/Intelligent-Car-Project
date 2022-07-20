@@ -6,7 +6,6 @@
  */
 
 #include "ros/ros.h"
-#include "std_msgs/Bool.h"
 #include "std_srvs/SetBool.h"
 #include "geometry_msgs/Twist.h"
 #include "tf/transform_broadcaster.h"
@@ -31,6 +30,9 @@
 #include <fstream>
 
 using namespace chassis_control;
+
+namespace chassis_control
+{
 
 class ChassisControl
 {
@@ -127,51 +129,51 @@ public:
         angle_pid = PID(angle_kp, angle_ki, angle_kd, max_steering_angle, max_angle_iout);
 
         // Start subscribers
-        location_sub = n.subscribe(location_topic, 1, &ChassisControl::location_Callback, this);
-        trajectory_sub = n.subscribe(trajectory_topic, 1, &ChassisControl::trajectory_Callback, this);
-//        ctrl_fb_sub = n.subscribe<yhs_can_msgs::ctrl_fb>(ctrl_fb_topic,1, &ChassisControl::ctrl_fb_Callback, this);
+        location_sub = n.subscribe(location_topic, 10, &ChassisControl::location_callback, this);
+        trajectory_sub = n.subscribe(trajectory_topic, 10, &ChassisControl::trajectory_callback, this);
+        ctrl_fb_sub = n.subscribe<yhs_can_msgs::ctrl_fb>(ctrl_fb_topic,10, &ChassisControl::ctrl_fb_callback, this);
 
         // Make publishers
-        ctrl_cmd_pub = n.advertise<yhs_can_msgs::ctrl_cmd>(ctrl_cmd_topic, 1);
+        ctrl_cmd_pub = n.advertise<yhs_can_msgs::ctrl_cmd>(ctrl_cmd_topic, 10);
 
         // Make service
-        auto_mode_server = n.advertiseService(auto_mode_service, &ChassisControl::auto_mode_Callback, this);
+        auto_mode_server = n.advertiseService(auto_mode_service, &ChassisControl::auto_mode_callback, this);
     }
-    
+
 
 
     // GPS feedback
-    void location_Callback(const nav_msgs::Odometry::ConstPtr & odom_msg)
+    void location_callback(const nav_msgs::Odometry::ConstPtr & odom_msg)
     {
         current_velocity = odom_msg->twist.twist.linear.x;
         current_w = odom_msg->twist.twist.angular.z;
     }
 
+//    // teb target
+//    void trajectory_callback(const teb_local_planner::FeedbackMsg::ConstPtr & msg)
+//    {
+//        double linear_x = msg->trajectories.front().trajectory.front().velocity.linear.x;
+//        double linear_y = msg->trajectories.front().trajectory.front().velocity.linear.y;
+//        target_velocity = sqrt(linear_x * linear_x + linear_y * linear_y);
+//        target_w = msg->trajectories.front().trajectory.front().velocity.angular.z;
+//    }
+
     // teb target
-    void trajectory_Callback(const teb_local_planner::FeedbackMsg::ConstPtr & msg)
+    void trajectory_callback(const geometry_msgs::Twist::ConstPtr & twist_msg)
     {
-        double linear_x = msg->trajectories.front().trajectory.front().velocity.linear.x;
-        double linear_y = msg->trajectories.front().trajectory.front().velocity.linear.y;
-        target_velocity = sqrt(linear_x * linear_x + linear_y * linear_y);
-        target_w = msg->trajectories.front().trajectory.front().velocity.angular.z;
+        target_velocity = twist_msg->linear.x;
+        target_w = twist_msg->angular.z;
     }
 
-//    // teb target
-//    void trajectory_Callback(const geometry_msgs::Twist::ConstPtr & twist_msg)
-//    {
-//        target_velocity = twist_msg->linear.x;
-//        target_w = twist_msg->angular.z;
-//    }
+    // chassis feedback
+    void ctrl_fb_callback(const yhs_can_msgs::ctrl_fb::ConstPtr & can_msg)
+    {
+        current_velocity = can_msg->ctrl_fb_velocity;
+        current_steering_angle = can_msg->ctrl_fb_steering;
+        current_gear = can_msg->ctrl_fb_gear;
+    }
 
-//    // chassis feedback
-//    void ctrl_fb_Callback(const yhs_can_msgs::ctrl_fb::ConstPtr & can_msg)
-//    {
-//        current_velocity = can_msg->ctrl_fb_velocity;
-//        current_steering_angle = can_msg->ctrl_fb_steering;
-//        current_gear = can_msg->ctrl_fb_gear;
-//    }
-
-    bool auto_mode_Callback(std_srvs::SetBool::Request & req, std_srvs::SetBool::Response & res)
+    bool auto_mode_callback(std_srvs::SetBool::Request & req, std_srvs::SetBool::Response & res)
     {
         mode = req.data;
         res.success = true;
@@ -185,7 +187,7 @@ public:
         update_timer = n.createTimer(ros::Duration(control_rate), &ChassisControl::update_output, this);
         ros::spin();
     }
-    
+
     void update_output(const ros::TimerEvent&)
     {
         if (mode == AUTO)
@@ -243,9 +245,9 @@ public:
         }
 
 
-        ROS_INFO("Velocity --- output: %.2f | target: %.2f | current: %.2f", ctrl_msg.ctrl_cmd_velocity, target_velocity, current_velocity);
+        ROS_INFO("Vel --- out: %.2f | tar: %.2f | cur: %.2f", ctrl_msg.ctrl_cmd_velocity, target_velocity, current_velocity);
         ROS_INFO("PID --- pout: %.2f | iout: %.2f | dout: %.2f", vel_pid.get_pout(), vel_pid.get_iout(), vel_pid.get_dout());
-//        ROS_INFO("Angle --- output: %.2f | target: %.2f | current: %.2f", ctrl_msg.ctrl_cmd_steering, target_steering_angle, current_steering_angle);
+        ROS_INFO("Angle --- out: %.2f | tar: %.2f | cur: %.2f", ctrl_msg.ctrl_cmd_steering, target_steering_angle, current_steering_angle);
 //        ROS_INFO("Gear --- target: %d | current: %d", ctrl_msg.ctrl_cmd_gear, current_gear);
 
 //        /* for debug */
@@ -257,6 +259,7 @@ public:
     }
 };
 
+}
 
 int main(int argc,char **argv)
 {
