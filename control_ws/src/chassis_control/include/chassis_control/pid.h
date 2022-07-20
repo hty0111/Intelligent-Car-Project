@@ -18,7 +18,6 @@ public:
     double get_iout();
     double get_dout();
 
-
 private:
     int mode;   // 0：位置式，1：增量式
     double kp, ki, kd;
@@ -26,6 +25,7 @@ private:
     double ref, fdb;
     double p_out, i_out, d_out, out;
     double error[3];     // 0：当前误差，1：上一时刻误差，2：上上时刻误差
+
     static double inline limit_max(double value, double max_value)
     {
         return (value < -max_value) ? -max_value : (value > max_value) ? max_value : value;

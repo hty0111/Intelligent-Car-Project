@@ -156,6 +156,8 @@ include_directories(
 
 add_executable(chassis_control_fr07 src/chassis_control_fr07.cpp src/pid.cpp)
 target_link_libraries(chassis_control_fr07 ${catkin_LIBRARIES})
+add_executable(chassis_control_fr09 src/chassis_control_fr09.cpp src/pid.cpp)
+target_link_libraries(chassis_control_fr09 ${catkin_LIBRARIES})
 
 #############
 ## Install ##

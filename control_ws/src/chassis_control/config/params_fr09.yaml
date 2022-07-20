@@ -1,22 +1,28 @@
 # vehicle params
-wheelbase: 0.66           # meters
-max_velocity: 5           # meters/second
-max_steering_angle: 28    # degree
+wheelbase: 0.85           # meters
+max_velocity: 8.3333      # meters/second
+max_steering_angle: 25    # degree
+max_brake: 100            # %
 
 # pid controller
-mode: 0   # 0: auto, 1: teach
-USE_PID_CONTROLLER: 0
+AUTO_MODE: 1
+USE_PID_CONTROLLER: 1
 control_rate: 0.01
+
 vel_pid_mode: 0   # 0: position, 1: delta
-vel_kp: 1
+vel_kp: 2
 vel_ki: 0.01
 vel_kd: 1
-max_vel_iout: 0.2
+max_vel_iout: 1
+
 angle_pid_mode: 0
 angle_kp: 0.4
 angle_ki: 0.05
 angle_kd: 1.5
-max_angle_iout: 10
+max_angle_iout: 5
+
+brake_threshold: 1  # meters/second
+brake_kp: 5
 
 # names of topics to listen to
 location_topic: "/gps_pose_vel"
