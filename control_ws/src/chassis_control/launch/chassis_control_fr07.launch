@@ -1,5 +1,5 @@
 <launch>
-    <node pkg="chassis_control_fr07" name="chassis_control_fr07" type="chassis_control_fr07" output="screen">
-        <rosparam command="load" file="$(find chassis_control_fr07)/params.yaml"/>
+    <node pkg="chassis_control" name="chassis_control_fr07" type="chassis_control_fr07" output="screen">
+        <rosparam command="load" file="params_fr07.yaml"/>
     </node>
 </launch>
