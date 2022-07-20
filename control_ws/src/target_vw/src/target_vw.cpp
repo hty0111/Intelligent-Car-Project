@@ -20,7 +20,7 @@ int main(int argc, char ** argv)
     while (ros::ok())
     {
         vel_msg.linear.x = 0.3;
-        vel_msg.angular.x = 5.0 / 180 * M_PI;
+        vel_msg.angular.z = 0.0 / 180 * M_PI;
         vel_pub.publish(vel_msg);
 
         ROS_INFO("PUBLISH | vel: %.2f, angle:%.2f", vel_msg.linear.x, vel_msg.angular.x);

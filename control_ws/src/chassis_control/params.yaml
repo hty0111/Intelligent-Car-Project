@@ -1,9 +1,10 @@
 # vehicle params
 wheelbase: 0.66           # meters
 max_velocity: 5           # meters/second
-max_steering_angle: 25    # degree
+max_steering_angle: 28    # degree
 
 # pid controller
+mode: 0   # 0: auto, 1: teach
 USE_PID_CONTROLLER: 0
 control_rate: 0.01
 vel_pid_mode: 0   # 0: position, 1: delta
@@ -18,11 +19,10 @@ angle_kd: 1.5
 max_angle_iout: 10
 
 # names of topics to listen to
-target_vw_topic: "/teb_feedback"  # "/target_vw"
+location_topic: "/gps_pose_vel"
+trajectory_topic: "/target_vw"  # "/teb_vel_now"
 ctrl_fb_topic: "/ctrl_fb"
 io_fb_topic: "/io_fb"
-lr_wheel_fb_topic: "/lr_wheel_fb"
-rr_wheel_fb_topic: "/rr_wheel_fb"
 
 # names of topics to publish to
 ctrl_cmd_topic: "/ctrl_cmd"
@@ -31,6 +31,9 @@ io_cmd_topic: "/io_cmd"
 # names of service
 auto_mode_service: "/Begin_stage_control_for_ask"
 
+# data path for teaching mode
+teaching_data_path: "./***.csv"
+
 # debug
-debug_vel: -0.2
-debug_angle: 10
+debug_vel: 0.2
+debug_angle: 0

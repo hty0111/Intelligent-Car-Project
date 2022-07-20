@@ -106,7 +106,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
 #  INCLUDE_DIRS include
-#  LIBRARIES chassis_control
+#  LIBRARIES chassis_control_fr07
 #  CATKIN_DEPENDS roscpp std_msgs
 #  DEPENDS system_lib
 )
@@ -126,7 +126,7 @@ include_directories(
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/chassis_control.cpp
+#   src/${PROJECT_NAME}/chassis_control_fr07.cpp
 # )
 
 ## Add cmake target dependencies of the library
@@ -154,8 +154,8 @@ include_directories(
 #   ${catkin_LIBRARIES}
 # )
 
-add_executable(chassis_control src/chassis_control.cpp src/pid.cpp)
-target_link_libraries(chassis_control ${catkin_LIBRARIES})
+add_executable(chassis_control_fr07 src/chassis_control_fr07.cpp src/pid.cpp)
+target_link_libraries(chassis_control_fr07 ${catkin_LIBRARIES})
 
 #############
 ## Install ##
